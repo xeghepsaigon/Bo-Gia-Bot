@@ -1,6 +1,6 @@
 import telebot
 from telebot import types
-import google.generativeai as genai
+from google import genai
 import PIL.Image
 import io
 import time
@@ -54,38 +54,17 @@ GEMINI_API_KEY = "AIzaSyDzmchOj4bYWbIQEABTSd0pRcn35USr-pE"
 TELEGRAM_TOKEN = "7936894568:AAE09DbRmAQNIlqBvBKZGTu8U-Z37O3AfZk"
 HERE_API_KEY = "1mFHwRVlN-EI6cwBscAq0rkVJ_uoOVm6J1DyVSwUc0E"
 
-# 1. Kết nối Google AI
-genai.configure(api_key=GEMINI_API_KEY)
+# 1. Kết nối Google AI - Sử dụng Client thay vì configure
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-# 2. HÀM CHỌN MODEL TỰ ĐỘNG (Sửa lỗi 404)
+# 2. HÀM CHỌN MODEL TỰ ĐỘNG
 def select_working_model():
-    print("🔍 Đang quét danh sách model khả dụng...")
-    try:
-        # Lấy danh sách các model mà Key này được phép dùng
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        print(f"📋 Danh sách model bạn có quyền dùng: {available_models}")
-        
-        # Thứ tự ưu tiên (phòng trường hợp lỗi tên model)
-        priorities = [
-            'models/gemini-1.5-flash-latest', 
-            'models/gemini-1.5-flash', 
-            'models/gemini-pro-vision'
-        ]
-        
-        for p in priorities:
-            if p in available_models:
-                print(f"✅ Đã chọn model: {p}")
-                return p
-        return available_models[0] # Chọn model đầu tiên nếu không khớp ưu tiên
-    except Exception as e:
-        print(f"❌ Không thể lấy danh sách model: {e}")
-        return 'models/gemini-1.5-flash' # Mặc định nếu lỗi
+    # Sử dụng model mặc định
+    default_model = 'gemini-2.0-flash'
+    print(f"✅ Sử dụng model: {default_model}")
+    return default_model
 
 SELECTED_MODEL_NAME = select_working_model()
-model = genai.GenerativeModel(
-    model_name=SELECTED_MODEL_NAME,
-    system_instruction="Chỉ trả về định dạng: 'Origin: [địa chỉ] | Destination: [địa chỉ]'"
-)
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
@@ -580,8 +559,11 @@ def handle_photo(message):
         img_data = bot.download_file(file_info.file_path)
         img = PIL.Image.open(io.BytesIO(img_data))
         
-        # Gọi Gemini
-        response = model.generate_content(["Trích xuất Origin và Destination trong ảnh này", img])
+        # Gọi Gemini qua Client API
+        response = client.models.generate_content(
+            model=SELECTED_MODEL_NAME,
+            contents=["Trích xuất Origin và Destination trong ảnh này", img]
+        )
         ai_text = response.text.strip()
         print(f"DEBUG AI: {ai_text}")
 
